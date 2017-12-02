@@ -200,16 +200,14 @@ __interrupt void Timer0_A0(void)
 	// 刷新全部数码管和LED指示灯
 	TM1638_RefreshDIGIandLED(digit, pnt, led);
 
-	// 检查当前键盘输入，0代表无键操作，1-16表示有对应按键
-	//   键号显示在两位数码管上
+	// 检查当前键盘输入，0代表无键操作，1-16表示有对应按键号显示在两位数码管上
 	key_code = TM1638_Readkeyboard();
 	if (key_code != 0)
 	{
-		if (key_cnt < 4)
-			key_cnt++;
+		if (key_cnt < 4) key_cnt++;
 		else if (key_cnt == 4)
 		{
-			if (key_code == 1)
+			if (key_code == 1) //SW1
 			{
 				if (dac6571_voltage < DAC6571_voltage_max)
 				{
@@ -217,7 +215,7 @@ __interrupt void Timer0_A0(void)
 					dac6571_flag = 1;
 				}
 			}
-			else if (key_code == 2)
+			else if (key_code == 2)  //SW2
 			{
 				if (dac6571_voltage > 0)
 				{
@@ -225,7 +223,7 @@ __interrupt void Timer0_A0(void)
 					dac6571_flag = 1;
 				}
 			}
-			else if (key_code == 3)
+			else if (key_code == 3)  //SW3
 			{
 				if (dac6571_voltage < DAC6571_voltage_max - 10)
 				{
@@ -233,7 +231,7 @@ __interrupt void Timer0_A0(void)
 					dac6571_flag = 1;
 				}
 			}
-			else if (key_code == 4)
+			else if (key_code == 4)  //SW4
 			{
 				if (dac6571_voltage > 10)
 				{
@@ -280,14 +278,12 @@ int main(void)
 	unsigned char i = 0;
 	float temp;
 	Init_Devices();
-	while (clock100ms < 3)
-		;						 // 延时60ms等待TM1638上电完成
+	while (clock100ms < 3) // 延时60ms等待TM1638上电完成
 	init_TM1638(); //初始化TM1638
 	dac6571_flag = 1;
 
 	while (1)
 	{
-
 		//当采满n_sample个样本后
 		if (display_key == 1)
 		{
