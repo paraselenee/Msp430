@@ -14,8 +14,8 @@
 #define V_T500ms 25
 
 // ADC10参考电压及量化单位
-#define a_v 1
-#define a_i 2
+#define a_v 2
+#define a_i 1
 #define b_v -0.002
 #define b_i 0.0078
 
@@ -73,7 +73,7 @@ unsigned char key_cnt = 0;
 int display_key = 0; //control the display
 // DAC6571
 unsigned int dac6571_code = 0x0800;
-unsigned int dac6571_voltage = 250; //#为什么是这个值
+unsigned int dac6571_voltage = 10; //#为什么是这个值
 unsigned char dac6571_flag = 0;
 
 //////////////////////////////
@@ -118,8 +118,7 @@ void Init_Devices(void)
 	WDTCTL = WDTPW + WDTHOLD; // Stop watchdog timer，停用看门狗
 	if (CALBC1_8MHZ == 0xFF || CALDCO_8MHZ == 0xFF)
 	{
-		while (1)
-			; // If calibration constants erased, trap CPU!!
+		while (1) // If calibration constants erased, trap CPU!!
 	}
 
 	//设置时钟，内部RC振荡器。     DCO：8MHz,供CPU时钟;  SMCLK：1MHz,供定时器时钟
@@ -200,14 +199,16 @@ __interrupt void Timer0_A0(void)
 	// 刷新全部数码管和LED指示灯
 	TM1638_RefreshDIGIandLED(digit, pnt, led);
 
-	// 检查当前键盘输入，0代表无键操作，1-16表示有对应按键号显示在两位数码管上
+	// 检查当前键盘输入，0代表无键操作，1-16表示有对应按键
+	//   键号显示在两位数码管上
 	key_code = TM1638_Readkeyboard();
 	if (key_code != 0)
 	{
-		if (key_cnt < 4) key_cnt++;
+		if (key_cnt < 4)
+			key_cnt++;
 		else if (key_cnt == 4)
 		{
-			if (key_code == 1) //SW1
+			if (key_code == 1)
 			{
 				if (dac6571_voltage < DAC6571_voltage_max)
 				{
@@ -215,7 +216,7 @@ __interrupt void Timer0_A0(void)
 					dac6571_flag = 1;
 				}
 			}
-			else if (key_code == 2)  //SW2
+			else if (key_code == 2)
 			{
 				if (dac6571_voltage > 0)
 				{
@@ -223,7 +224,7 @@ __interrupt void Timer0_A0(void)
 					dac6571_flag = 1;
 				}
 			}
-			else if (key_code == 3)  //SW3
+			else if (key_code == 3)
 			{
 				if (dac6571_voltage < DAC6571_voltage_max - 10)
 				{
@@ -231,7 +232,7 @@ __interrupt void Timer0_A0(void)
 					dac6571_flag = 1;
 				}
 			}
-			else if (key_code == 4)  //SW4
+			else if (key_code == 4)
 			{
 				if (dac6571_voltage > 10)
 				{
@@ -239,25 +240,27 @@ __interrupt void Timer0_A0(void)
 					dac6571_flag = 1;
 				}
 			}
+			else if (key_code == 5)
+			{
+				display_key = 0;
+			}
+			else if (key_code == 6)
+			{
+				display_key = 1;
+			}
+
 			key_cnt = 5;
 		}
 	}
 	else
 		key_cnt = 0;
 
-	if (key_code == 5)
-	{
-		display_key = 0;
-	}
-	if (key_code == 6)
-	{
-		display_key = 1;
-	}
-
 	if (display_key == 0)
 	{
-		digit[6] = key_code % 10;
-		digit[5] = key_code / 10;
+		//digit[6]=key_code%10;
+		//digit[5]=key_code/10;
+		//digit[6]=6;
+		//digit[5]=5;
 	}
 }
 
@@ -279,7 +282,7 @@ int main(void)
 	float temp;
 	Init_Devices();
 	while (clock100ms < 3) // 延时60ms等待TM1638上电完成
-	init_TM1638(); //初始化TM1638
+		init_TM1638();			 //初始化TM1638
 	dac6571_flag = 1;
 
 	while (1)
@@ -289,8 +292,8 @@ int main(void)
 		{
 			//ADC10转换
 			ADC10CTL0 |= ENC + ADC10SC;
-			while (ADC10CTL1 & BUSY); //等待ADC10转换完成
-			ADC10SA = (unsigned int)sample;
+			while (ADC10CTL1 & BUSY) //等待ADC10转换完成
+				ADC10SA = (unsigned int)sample;
 			ADC10CTL0 &= ~ENC;
 
 			++i_sample;
@@ -336,7 +339,7 @@ int main(void)
 				dac6571_flag = 0;
 				digit[0] = ' ';
 				digit[1] = dac6571_voltage / 100 % 10; //计算个位数
-				digit[2] = dac6571_voltage / 10 % 10;	 //计算十分位数
+				digit[2] = dac6571_voltage / 10 % 10;	//计算十分位数
 				digit[3] = dac6571_voltage % 10;			 //计算百分位数
 				digit[4] = ' ';
 				digit[5] = ' ';
