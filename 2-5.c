@@ -137,10 +137,10 @@ void Init_Devices(void)
 
 void dac6571_byte_transmission(unsigned char byte_data)
 {
-	unsigned char i, shelter;
+	unsigned char shelter;
 	shelter = 0x80;
 
-	for (i = 1; i <= 8; i++)
+	for (int i = 1; i <= 8; i++)
 	{
 		if ((byte_data & shelter) == 0)
 			SDA_L;
