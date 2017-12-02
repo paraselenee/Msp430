@@ -14,10 +14,10 @@
 #define V_T500ms 25
 
 // ADC10参考电压及量化单位
-#define a_v 2
-#define a_i 1
-#define b_v -0.002
-#define b_i 0.0078
+#define a_voltage 5.1836
+#define a_current 42.36
+#define b_voltage -0.0635
+#define b_current -0.3427
 
 #define n_sample 64
 //	ADC10 变量定义
@@ -26,8 +26,8 @@ unsigned int sample_v[n_sample] = {0};
 unsigned int sample_i[n_sample] = {0};
 unsigned int i_sample = 0;
 
-double v_avg, i_avg;
-double v, i;
+double average_voltage, average_current;
+double corrected_voltage, corrected_current;
 int display;
 
 //DAC6571操作  P1.4接SDA(pin4),P1.5接SCL(pin5)
@@ -35,9 +35,9 @@ int display;
 #define SCL_H P1OUT |= BIT5
 #define SDA_L P1OUT &= ~BIT4
 #define SDA_H P1OUT |= BIT4
-#define SDA_IN    \
-	P1OUT |= BIT4;  \
-	P1DIR &= ~BIT4; \
+#define SDa_currentN \
+	P1OUT |= BIT4;     \
+	P1DIR &= ~BIT4;    \
 	P1REN |= BIT4
 #define SDA_OUT  \
 	P1DIR |= BIT4; \
@@ -150,7 +150,7 @@ void dac6571_byte_transmission(unsigned char byte_data)
 		SCL_L;
 		shelter >>= 1;
 	}
-	SDA_IN;
+	SDa_currentN;
 	SCL_H;
 	SCL_L;
 	SDA_OUT;
@@ -259,8 +259,8 @@ __interrupt void Timer0_A0(void)
 	{
 		//digit[6]=key_code%10;
 		//digit[5]=key_code/10;
-		//digit[6]=6;
-		//digit[5]=5;
+		//digit[6]=0;
+		//digit[5]=0;
 	}
 }
 
@@ -278,7 +278,6 @@ __interrupt void ADC10ISR(void)
 
 int main(void)
 {
-	unsigned char i = 0;
 	float temp;
 	Init_Devices();
 	while (clock100ms < 3) // 延时60ms等待TM1638上电完成
@@ -302,27 +301,26 @@ int main(void)
 			{
 				i_sample = 0;
 				//计算平均值
-				unsigned int sum_v = 0;
-				unsigned int sum_i = 0;
-				int k;
-				for (k = 0; k < n_sample; ++k)
+				unsigned int sum_voltage = 0;
+				unsigned int sum_current = 0;
+				for (int k = 0; k < n_sample; ++k)
 				{
-					sum_v += sample_v[k];
-					sum_i += sample_i[k];
+					sum_voltage += sample_v[k];
+					sum_current += sample_i[k];
 				}
 
-				v_avg = 3.55 * sum_v / n_sample / 1024;
+				average_voltage = 3.55 * sum_voltage / n_sample / 1024;
 				//计算A1端口上的模拟输入电压
-				v = a_v * v_avg + b_v;
+				corrected_voltage = a_voltage * average_voltage + b_voltage;
 				display = (int)(1000 * v);
 				digit[0] = (display / 1000) % 10;
 				digit[1] = (display / 100) % 10;
 				digit[2] = (display / 10) % 10;
 				digit[3] = (display / 1) % 10;
 
-				i_avg = 3.55 * sum_i / n_sample / 1024;
+				average_current = 3.55 * sum_current / n_sample / 1024;
 				//记录A0端口上的模拟输入电压(按照转换规则A0后被采样并传输)
-				i = a_i * i_avg + b_i;
+				corrected_current = a_current * average_current + b_current;
 				display = (int)(1000 * i);
 				digit[4] = (display / 1000) % 10;
 				digit[5] = (display / 100) % 10;
@@ -357,7 +355,7 @@ int main(void)
 			clock500ms_flag = 0;
 			// 8个指示灯以走马灯方式，每0.5秒向右（循环）移动一格
 			temp = led[0];
-			for (i = 0; i < 7; i++)
+			for (int i = 0; i < 7; i++)
 				led[i] = led[i + 1];
 			led[7] = temp;
 		}
