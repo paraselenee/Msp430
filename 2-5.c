@@ -15,17 +15,13 @@
 
 // ADC10参考电压及量化单位
 #define a_voltage 5.1836
-#define a_current 42.36
 #define b_voltage -0.0635
-#define b_current -0.3427
+#define a_current_source_current 42.36
+#define b_current_source_current -0.3427
+#define a_voltage_source_current 1
+#define b_voltage_source_current 0
 
 #define n_sample 8
-//	ADC10 变量定义
-unsigned int sample[32] = {0}; //存放ADC采样结果（一次转换产生的四个结果）
-
-double average_voltage, average_current;
-double corrected_voltage, corrected_current;
-int display;
 
 //DAC6571操作  P1.4接SDA(pin4),P1.5接SCL(pin5)
 #define SCL_L P1OUT &= ~BIT5
@@ -260,6 +256,15 @@ __interrupt void Timer0_A0(void)
 int main(void)
 {
 	float temp;
+	double average_current_source_voltage, average_voltage_source_current, average_current_source_current;
+	double corrected_current_source_voltage, corrected_current_source_current, corrected_voltage_source_current;
+	int display; //待显示数字
+	unsigned int sample[32] = {0}; //存放ADC采样结果（一次转换产生的四个结果）
+	unsigned int sum_current_source_voltage = 0; //电流源的采样电压
+	unsigned int sum_current_source_current = 0; //电流源的采样电流
+	unsigned int sum_voltage_source_current = 0; //电压源的采样电流
+	int k, i; //循环计数
+	
 	Init_Devices();
 	while (clock100ms < 3)
 		;						 // 延时60ms等待TM1638上电完成
@@ -269,18 +274,14 @@ int main(void)
 	while (1)
 	{
 		//ADC10转换
-		ADC10CTL0 &= ~ENC;
+		ADC10CTL0 &= ~ENC; //关
 		while (ADC10CTL1 & BUSY)
 			; //等待ADC10转换完成
-		ADC10CTL0 |= ENC + ADC10SC;
+		ADC10CTL0 |= ENC + ADC10SC; //开，采样，转换
 		ADC10SA = (unsigned int)sample; //地址负值
-		ADC10CTL0 &= ~ENC;
+		ADC10CTL0 &= ~ENC; //关
 
 		//计算平均值
-		unsigned int sum_current_source_voltage = 0; //电流源的采样电压
-		unsigned int sum_current_source_current = 0; //电流源的采样电流
-		unsigned int sum_voltage_source_current = 0; //电压源的采样电流
-		int k;
 		for (k = 0; k < n_sample; ++k) //采样8次
 		{
 			sum_current_source_voltage += sample[k * 4];		 //p1.3
@@ -290,10 +291,10 @@ int main(void)
 
 		if (display_key == 0)
 		{
-			average_voltage = 3.55 * sum_current_source_voltage / n_sample / 1024;
+			average_current_source_voltage = 3.55 * sum_current_source_voltage / n_sample / 1024;
 			//计算A1端口上的模拟输入电压
-			corrected_voltage = a_voltage * average_voltage + b_voltage;
-			display = (int)(1000 * corrected_voltage);
+			corrected_current_source_voltage = a_voltage * average_current_source_voltage + b_voltage;
+			display = (int)(1000 * corrected_current_source_voltage);
 			digit[4] = (display / 1000) % 10;
 			digit[5] = (display / 100) % 10;
 			digit[6] = (display / 10) % 10;
@@ -312,28 +313,28 @@ int main(void)
 				digit[6] = ' ';
 				digit[7] = ' ';
 				temp = dac6571_voltage * 4096.0 / (DAC6571_voltage_max + 1);
-				dac6571_code = temp - 50;
+				dac6571_code = temp - 50; //修改
 				dac6571_fastmode_operation();
 			}
 		}
 
 		if (display_key == 1)
 		{
-			average_current = 3.55 * sum_voltage_source_current / n_sample / 1024;
+			average_voltage_source_current = 3.55 * sum_voltage_source_current / n_sample / 1024;
 			//记录A0端口上的模拟输入电压(按照转换规则A0后被采样并传输)
 			//电压源的采样电流
-			corrected_current = a_current * average_current + b_current;
-			display = (int)(1000 * corrected_current);
+			corrected_voltage_source_current = a_voltage_source_current * average_voltage_source_current + b_voltage_source_current;
+			display = (int)(1000 * corrected_voltage_source_current);
 			digit[0] = (display / 1000) % 10;
 			digit[1] = (display / 100) % 10;
 			digit[2] = (display / 10) % 10;
 			digit[3] = (display / 1) % 10;
 
-			average_current = 3.55 * sum_current_source_current / n_sample / 1024;
+			average_current_source_current = 3.55 * sum_current_source_current / n_sample / 1024;
 			//记录A0端口上的模拟输入电压(按照转换规则A0后被采样并传输)
 			//电流源的采样电流
-			corrected_current = a_voltage * average_current + b_current; //?
-			display = (int)(1000 * corrected_current);
+			corrected_current_source_current = a_current_source_current * average_current_source_current + b_current_source_current;
+			display = (int)(1000 * corrected_current_source_current);
 			digit[4] = (display / 1000) % 10;
 			digit[5] = (display / 100) % 10;
 			digit[6] = (display / 10) % 10;
@@ -346,7 +347,6 @@ int main(void)
 			clock500ms_flag = 0;
 			// 8个指示灯以走马灯方式，每0.5秒向右（循环）移动一格
 			temp = led[0];
-			int i;
 			for (i = 0; i < 7; i++)
 				led[i] = led[i + 1];
 			led[7] = temp;
