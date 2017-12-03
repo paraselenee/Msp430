@@ -21,8 +21,7 @@
 
 #define n_sample 8
 //	ADC10 变量定义
-unsigned int sample[32] = {0}; //存放ADC采样结果（一次转换产生的两个结果）
-unsigned int i_sample = 0;
+unsigned int sample[32] = {0}; //存放ADC采样结果（一次转换产生的四个结果）
 
 double average_voltage, average_current;
 double corrected_voltage, corrected_current;
@@ -102,11 +101,11 @@ void Init_Timer0(void)
 //	ADC10初始化
 void Init_ADC10()
 {
-	ADC10CTL1 = CONSEQ_3 + INCH_3; // 2通道单次转换, 最大转换通道为A1
+	ADC10CTL1 = CONSEQ_3 + INCH_3; // 4通道单次转换, 最大转换通道为A3
 	ADC10CTL0 = ADC10SHT_2 + ADC10ON + ADC10IE + MSC;
-	//采样保持时间为16 x ADC10CLKs，ADC内核开，中断使能   MSC多次转换选择开
+	//采样保持时间为16 x ADC10CLKs，ADC内核开，中断使能，MSC多次转换选择开
 	//参考电压选默认值VCC和VSS
-	ADC10DTC1 = 0x20;
+	ADC10DTC1 = 0x20; //采样32次
 	ADC10AE0 |= BIT0 + BIT1 + BIT2 + BIT3; // 使能模拟输入脚A0 A1 A2 A3
 }
 
@@ -116,8 +115,7 @@ void Init_Devices(void)
 	WDTCTL = WDTPW + WDTHOLD; // Stop watchdog timer，停用看门狗
 	if (CALBC1_8MHZ == 0xFF || CALDCO_8MHZ == 0xFF)
 	{
-		while (1)
-			; // If calibration constants erased, trap CPU!!
+		while (1) // If calibration constants erased, trap CPU!!
 	}
 
 	//设置时钟，内部RC振荡器。     DCO：8MHz,供CPU时钟;  SMCLK：1MHz,供定时器时钟
@@ -262,34 +260,32 @@ int main(void)
 {
 	float temp;
 	Init_Devices();
-	while (clock100ms < 3) // 延时60ms等待TM1638上电完成
-		init_TM1638();			 //初始化TM1638
+	while (clock100ms < 3)
+		;						 // 延时60ms等待TM1638上电完成
+	init_TM1638(); //初始化TM1638
 	dac6571_flag = 1;
 
 	while (1)
 	{
-		//当采满n_sample个样本后
-		if (1)
-		{
+		// if (1)
+		// {
 			//ADC10转换
-			ADC10CTL0 |= ENC + ADC10SC;
-			while (ADC10CTL1 & BUSY) //等待ADC10转换完成
-				ADC10SA = (unsigned int)sample;
 			ADC10CTL0 &= ~ENC;
-			//++i_sample;
-
-			if (1)
-			{
-				i_sample = 0;
+			while (ADC10CTL1 & BUSY); //等待ADC10转换完成
+			ADC10CTL0 |= ENC + ADC10SC;
+			ADC10SA = (unsigned int)sample; //地址负值
+			ADC10CTL0 &= ~ENC;
+			// if (1)
+			// {
 				//计算平均值
 				unsigned int sum_current_source_voltage = 0; //电流源的采样电压
 				unsigned int sum_current_source_current = 0; //电流源的采样电流
 				unsigned int sum_voltage_source_current = 0; //电压源的采样电流
-				for (int k = 0; k < n_sample; ++k)
+				for (int k = 0; k < n_sample; ++k)					 //采样8次
 				{
-					sum_current_source_voltage += sample[k * 4];
-					sum_current_source_current += sample[k * 4 + 1];
-					sum_voltage_source_current += sample[k * 4 + 2];
+					sum_current_source_voltage += sample[k * 4];//p1.3
+					sum_current_source_current += sample[k * 4 + 1];//p1.2
+					sum_voltage_source_current += sample[k * 4 + 2];//p1.1
 				}
 
 				if (display_key == 0)
@@ -297,12 +293,28 @@ int main(void)
 					average_voltage = 3.55 * sum_current_source_voltage / n_sample / 1024;
 					//计算A1端口上的模拟输入电压
 					corrected_voltage = a_voltage * average_voltage + b_voltage;
-					display = (int)(1000 * v);
+					display = (int)(1000 * corrected_voltage);
 					digit[4] = (display / 1000) % 10;
 					digit[5] = (display / 100) % 10;
 					digit[6] = (display / 10) % 10;
 					digit[7] = (display / 1) % 10;
 					pnt = 0x12;
+
+					if (dac6571_flag == 1) // 检查DAC电压是否要变
+					{
+						dac6571_flag = 0;
+						digit[0] = ' ';
+						digit[1] = dac6571_voltage / 100 % 10; //计算个位数
+						digit[2] = dac6571_voltage / 10 % 10;	//计算十分位数
+						digit[3] = dac6571_voltage % 10;			 //计算百分位数
+						digit[4] = ' ';
+						digit[5] = ' ';
+						digit[6] = ' ';
+						digit[7] = ' ';
+						temp = dac6571_voltage * 4096.0 / (DAC6571_voltage_max + 1);
+						dac6571_code = temp - 50;
+						dac6571_fastmode_operation();
+					}
 				}
 
 				if (display_key == 1)
@@ -311,7 +323,7 @@ int main(void)
 					//记录A0端口上的模拟输入电压(按照转换规则A0后被采样并传输)
 					//电压源的采样电流
 					corrected_current = a_current * average_current + b_current;
-					display = (int)(1000 * ii);
+					display = (int)(1000 * corrected_current);
 					digit[0] = (display / 1000) % 10;
 					digit[1] = (display / 100) % 10;
 					digit[2] = (display / 10) % 10;
@@ -321,34 +333,34 @@ int main(void)
 					//记录A0端口上的模拟输入电压(按照转换规则A0后被采样并传输)
 					//电流源的采样电流
 					corrected_current = a_voltage * average_current + b_current; //?
-					display = (int)(1000 * ii);
+					display = (int)(1000 * corrected_current);
 					digit[4] = (display / 1000) % 10;
 					digit[5] = (display / 100) % 10;
 					digit[6] = (display / 10) % 10;
 					digit[7] = (display / 1) % 10;
 					pnt = 0x11;
-				}
-			}
+			// 	}
+			// }
 		}
 
-		if (display_key == 0)
-		{
-			if (dac6571_flag == 1) // 检查DAC电压是否要变
-			{
-				dac6571_flag = 0;
-				digit[0] = ' ';
-				digit[1] = dac6571_voltage / 100 % 10; //计算个位数
-				digit[2] = dac6571_voltage / 10 % 10;	//计算十分位数
-				digit[3] = dac6571_voltage % 10;			 //计算百分位数
-				digit[4] = ' ';
-				digit[5] = ' ';
-				digit[6] = ' ';
-				digit[7] = ' ';
-				temp = dac6571_voltage * 4096.0 / (DAC6571_voltage_max + 1);
-				dac6571_code = temp - 50;
-				dac6571_fastmode_operation();
-			}
-		}
+		// if (display_key == 0)
+		// {
+		// 	if (dac6571_flag == 1) // 检查DAC电压是否要变
+		// 	{
+		// 		dac6571_flag = 0;
+		// 		digit[0] = ' ';
+		// 		digit[1] = dac6571_voltage / 100 % 10; //计算个位数
+		// 		digit[2] = dac6571_voltage / 10 % 10;	//计算十分位数
+		// 		digit[3] = dac6571_voltage % 10;			 //计算百分位数
+		// 		digit[4] = ' ';
+		// 		digit[5] = ' ';
+		// 		digit[6] = ' ';
+		// 		digit[7] = ' ';
+		// 		temp = dac6571_voltage * 4096.0 / (DAC6571_voltage_max + 1);
+		// 		dac6571_code = temp - 50;
+		// 		dac6571_fastmode_operation();
+		// 	}
+		// }
 
 		if (clock500ms_flag == 1) // 检查0.5秒定时是否到
 		{
