@@ -13,14 +13,14 @@
 // 0.5s软件定时器溢出值，25个20ms
 #define V_T500ms 25
 
-// ADC10参考电压及量化单位
-#define a_voltage 1
-#define b_voltage 1
-#define a_current 0
-#define b_current 0
+// ADC10参考电压及量化单位 5.1和10欧负载都可以
+#define a_voltage 2.5091
+#define b_voltage 0.0146
+#define a_current 1.2663
+#define b_current -0.0174
 
 #define n_sample 64
-#define average_num
+#define average_num 5
 
 //	ADC10 变量定义
 unsigned int sample[2] = {0}; //存放ADC采样结果（一次转换产生的两个结果）
