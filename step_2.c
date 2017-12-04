@@ -14,13 +14,13 @@
 #define V_T500ms 25
 
 // ADC10参考电压及量化单位
-#define a_voltage 1.765
-#define a_current 1.03
-#define b_voltage 0.7522
-#define b_current -0.03
+#define a_voltage 1
+#define b_voltage 1
+#define a_current 0
+#define b_current 0
 
 #define n_sample 64
-#define average_num 
+#define average_num
 
 //	ADC10 变量定义
 unsigned int sample[2] = {0}; //存放ADC采样结果（一次转换产生的两个结果）
@@ -282,12 +282,10 @@ __interrupt void ADC10ISR(void)
 int main(void)
 {
   float temp;
-  int i, k, turn; //, index, non_zero = 0;
-  int average_count = 0,
+  int i, k, average_count = 0;
   double average_queue_voltage[average_num] = {0};
   double average_queue_current[average_num] = {0};
-  double show_voltage = 0, all_voltage = 0;
-  double show_current = 0, all_current = 0;
+  double all_voltage = 0, all_current = 0;
   Init_Devices();
   while (clock100ms < 3)
     ;            // 延时60ms等待TM1638上电完成
@@ -306,11 +304,9 @@ int main(void)
       ADC10CTL0 &= ~ENC;
 
       ++i_sample;
-      turn = 0;
       //当采满n_sample个样本后
       if (i_sample == n_sample)
       {
-        ++turn;
         i_sample = 0;
         //计算平均值
         unsigned int sum_voltage = 0;
@@ -322,62 +318,34 @@ int main(void)
         }
 
         average_voltage = 3.55 * sum_voltage / n_sample / 1024; //计算A1端口上的模拟输入电压
-        corrected_voltage = a_voltage * average_voltage + b_voltage;
         average_current = 3.55 * sum_current / n_sample / 1024; //记录A0端口上的模拟输入电压(按照转换规则A0后被采样并传输)
-        corrected_current = a_current * average_current + b_current;
         //建队列
         if (average_count < average_num)
         {
-          average_queue_voltage[average_count] = corrected_voltage;
-          average_queue_current[average_count] = corrected_current;
+          average_queue_voltage[average_count] = average_voltage;
+          average_queue_current[average_count] = average_current;
         }
         else
         {
           average_count = 0;
-          average_queue_voltage[0] = corrected_voltage;
-          average_queue_current[0] = corrected_current;
+          average_queue_voltage[0] = average_voltage;
+          average_queue_current[0] = average_current;
         }
-        if (turn > average_num)
-        {
-          all_voltage += average_queue_voltage[average_count];
-          all_current += average_queue_current[average_count];
-          all_voltage -= average_queue_voltage[(average_count + 1) % average_num];
-          all_current -= average_queue_current[(average_count + 1) % average_num];
-          show_voltage = all_voltage / average_num;
-          show_current = all_current / average_num;
-        }
-        else
-        {
-          show_voltage = all_voltage / turn;
-          show_current = all_current / turn;
-        }
+        //滑动平均
+        all_voltage += average_queue_voltage[average_count];
+        all_current += average_queue_current[average_count];
+        all_voltage -= average_queue_voltage[(average_count + 1) % average_num];
+        all_current -= average_queue_current[(average_count + 1) % average_num];
+        corrected_voltage = a_voltage * all_voltage / average_num + b_voltage;
+        corrected_current = a_current * all_current / average_num + b_current;
         average_count++;
 
-        // //求平均
-        // for (index = 0; index < average_num; index++)
-        // {
-        //   if (average_queue_voltage[index] != 0)
-        //   {
-        //     non_zero++;
-        //     all_voltage += average_queue_voltage[index];
-        //     all_current += average_queue_current[index];
-        //   }
-        //   if (index == average_num)
-        //   {
-        //     show_voltage = all_voltage / non_zero;
-        //     show_current = all_current / non_zero;
-        //     non_zero = 0;
-        //     all_voltage = 0;
-        //     all_current = 0;
-        //   }
-        // }
-
-        display = (int)(1000 * show_voltage);
+        display = (int)(1000 * corrected_voltage);
         digit[0] = (display / 1000) % 10;
         digit[1] = (display / 100) % 10;
         digit[2] = (display / 10) % 10;
         digit[3] = (display / 1) % 10;
-        display = (int)(1000 * show_current);
+        display = (int)(1000 * corrected_current);
         digit[4] = (display / 1000) % 10;
         digit[5] = (display / 100) % 10;
         digit[6] = (display / 10) % 10;
