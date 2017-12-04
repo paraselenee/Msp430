@@ -14,13 +14,13 @@
 #define V_T500ms 25
 
 // ADC10参考电压及量化单位
-#define a_voltage 5.1836
-#define a_current 42.36
-#define b_voltage -0.0635
-#define b_current -0.3427
+#define a_voltage 1.765
+#define a_current 1.03
+#define b_voltage 0.7522
+#define b_current -0.03
 
 #define n_sample 64
-#define average_num 5
+#define average_num 
 
 //	ADC10 变量定义
 unsigned int sample[2] = {0}; //存放ADC采样结果（一次转换产生的两个结果）
@@ -282,12 +282,12 @@ __interrupt void ADC10ISR(void)
 int main(void)
 {
   float temp;
-  int i, k;
-  unsigned int average_queue_voltage[average_num] = {0};
-  unsigned int average_queue_current[average_num] = {0};
-  int average_count = 0, index, non_zero = 0;
-  int show_voltage = 0, all_voltage = 0;
-  int show_current = 0, all_current = 0;
+  int i, k, turn; //, index, non_zero = 0;
+  int average_count = 0,
+  double average_queue_voltage[average_num] = {0};
+  double average_queue_current[average_num] = {0};
+  double show_voltage = 0, all_voltage = 0;
+  double show_current = 0, all_current = 0;
   Init_Devices();
   while (clock100ms < 3)
     ;            // 延时60ms等待TM1638上电完成
@@ -296,7 +296,6 @@ int main(void)
 
   while (1)
   {
-    //当采满n_sample个样本后
     if (display_key == 1)
     {
       //ADC10转换
@@ -307,9 +306,11 @@ int main(void)
       ADC10CTL0 &= ~ENC;
 
       ++i_sample;
-
+      turn = 0;
+      //当采满n_sample个样本后
       if (i_sample == n_sample)
       {
+        ++turn;
         i_sample = 0;
         //计算平均值
         unsigned int sum_voltage = 0;
@@ -329,32 +330,47 @@ int main(void)
         {
           average_queue_voltage[average_count] = corrected_voltage;
           average_queue_current[average_count] = corrected_current;
-          average_count++;
         }
         else
         {
+          average_count = 0;
           average_queue_voltage[0] = corrected_voltage;
           average_queue_current[0] = corrected_current;
-          average_count = 1;
         }
-        //求平均
-        for (index = 0; index < average_num; index++)
+        if (turn > average_num)
         {
-          if (average_queue_voltage[index] != 0)
-          {
-            non_zero++;
-            all_voltage += average_queue_voltage[index];
-            all_current += average_queue_current[index];
-          }
-          if (index == average_num)
-          {
-            show_voltage = all_voltage / non_zero;
-            show_current = all_current / non_zero;
-            non_zero = 0;
-            all_voltage = 0;
-            all_current = 0;
-          }
+          all_voltage += average_queue_voltage[average_count];
+          all_current += average_queue_current[average_count];
+          all_voltage -= average_queue_voltage[(average_count + 1) % average_num];
+          all_current -= average_queue_current[(average_count + 1) % average_num];
+          show_voltage = all_voltage / average_num;
+          show_current = all_current / average_num;
         }
+        else
+        {
+          show_voltage = all_voltage / turn;
+          show_current = all_current / turn;
+        }
+        average_count++;
+
+        // //求平均
+        // for (index = 0; index < average_num; index++)
+        // {
+        //   if (average_queue_voltage[index] != 0)
+        //   {
+        //     non_zero++;
+        //     all_voltage += average_queue_voltage[index];
+        //     all_current += average_queue_current[index];
+        //   }
+        //   if (index == average_num)
+        //   {
+        //     show_voltage = all_voltage / non_zero;
+        //     show_current = all_current / non_zero;
+        //     non_zero = 0;
+        //     all_voltage = 0;
+        //     all_current = 0;
+        //   }
+        // }
 
         display = (int)(1000 * show_voltage);
         digit[0] = (display / 1000) % 10;
