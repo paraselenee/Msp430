@@ -289,13 +289,13 @@ int main(void)
 			sum_voltage_source_current += sample[k * 4 + 2]; //p1.1
 		}
 
-		if (display_key == 0)
+		if (display_key == 0) //p1.3
 		{
 			average_current_source_voltage = 3.55 * sum_current_source_voltage / n_sample / 1024;
 			//计算A1端口上的模拟输入电压
 			corrected_current_source_voltage = a_voltage * average_current_source_voltage + b_voltage;
 			display = (int)(1000 * corrected_current_source_voltage);
-			digit[4] = (display / 1000) % 10;
+			digit[4] = (display / 1000) % 10; //p1.3
 			digit[5] = (display / 100) % 10;
 			digit[6] = (display / 10) % 10;
 			digit[7] = (display / 1) % 10;
@@ -325,7 +325,7 @@ int main(void)
 			//电压源的采样电流
 			corrected_voltage_source_current = a_voltage_source_current * average_voltage_source_current + b_voltage_source_current;
 			display = (int)(1000 * corrected_voltage_source_current);
-			digit[0] = (display / 1000) % 10;
+			digit[0] = (display / 1000) % 10; //p1.1
 			digit[1] = (display / 100) % 10;
 			digit[2] = (display / 10) % 10;
 			digit[3] = (display / 1) % 10;
@@ -335,7 +335,7 @@ int main(void)
 			//电流源的采样电流
 			corrected_current_source_current = a_current_source_current * average_current_source_current + b_current_source_current;
 			display = (int)(1000 * corrected_current_source_current);
-			digit[4] = (display / 1000) % 10;
+			digit[4] = (display / 1000) % 10; //p1.2
 			digit[5] = (display / 100) % 10;
 			digit[6] = (display / 10) % 10;
 			digit[7] = (display / 1) % 10;
