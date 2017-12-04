@@ -86,10 +86,10 @@ unsigned char dac6571_flag = 0;
 void Init_Ports(void)
 {
   P2SEL &= ~(BIT7 + BIT6); //P2.6、P2.7 设置为通用I/O端口
-      //因两者默认连接外晶振，故需此修改
+                           //因两者默认连接外晶振，故需此修改
 
   P2DIR |= BIT7 + BIT6 + BIT5; //P2.5、P2.6、P2.7 设置为输出
-      //本电路板中三者用于连接显示和键盘管理器TM1638，工作原理详见其DATASHEET
+                               //本电路板中三者用于连接显示和键盘管理器TM1638，工作原理详见其DATASHEET
 
   P1DIR |= BIT4 + BIT5;
   P1OUT |= BIT4 + BIT5;
@@ -283,6 +283,11 @@ int main(void)
 {
   float temp;
   int i, k;
+  unsigned int average_queue_voltage[average_num] = {0};
+  unsigned int average_queue_current[average_num] = {0};
+  int average_count = 0, index, non_zero = 0;
+  int show_voltage = 0, all_voltage = 0;
+  int show_current = 0, all_current = 0;
   Init_Devices();
   while (clock100ms < 3)
     ;            // 延时60ms等待TM1638上电完成
@@ -319,18 +324,12 @@ int main(void)
         corrected_voltage = a_voltage * average_voltage + b_voltage;
         average_current = 3.55 * sum_current / n_sample / 1024; //记录A0端口上的模拟输入电压(按照转换规则A0后被采样并传输)
         corrected_current = a_current * average_current + b_current;
-
-        int average_count = 0, index, non_zero = 0;
-        int show_voltage = 0, all_voltage = 0;
-        int show_current = 0, all_current = 0;
-        unsigned int average_queue_voltage[average_num] = {0};
-        unsigned int average_queue_current[average_num] = {0};
         //建队列
         if (average_count < average_num)
         {
           average_queue_voltage[average_count] = corrected_voltage;
           average_queue_current[average_count] = corrected_current;
-          average_count ++;
+          average_count++;
         }
         else
         {
@@ -341,7 +340,7 @@ int main(void)
         //求平均
         for (index = 0; index < average_num; index++)
         {
-          if (average_queue_voltage[index] !=0)
+          if (average_queue_voltage[index] != 0)
           {
             non_zero++;
             all_voltage += average_queue_voltage[index];
@@ -359,15 +358,15 @@ int main(void)
 
         display = (int)(1000 * show_voltage);
         digit[0] = (display / 1000) % 10;
-				digit[1] = (display / 100) % 10;
-				digit[2] = (display / 10) % 10;
-				digit[3] = (display / 1) % 10;
+        digit[1] = (display / 100) % 10;
+        digit[2] = (display / 10) % 10;
+        digit[3] = (display / 1) % 10;
         display = (int)(1000 * show_current);
         digit[4] = (display / 1000) % 10;
-				digit[5] = (display / 100) % 10;
-				digit[6] = (display / 10) % 10;
-				digit[7] = (display / 1) % 10;
-				pnt = 0x11;
+        digit[5] = (display / 100) % 10;
+        digit[6] = (display / 10) % 10;
+        digit[7] = (display / 1) % 10;
+        pnt = 0x11;
       }
     }
 
