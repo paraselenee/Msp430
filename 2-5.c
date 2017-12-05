@@ -14,15 +14,16 @@
 #define V_T500ms 25 //LED走马灯
 
 //标定参数
-#define a_current_source_voltage 1 
+#define a_current_source_voltage 1
 #define b_current_source_voltage 0
 #define a_current_source_current 1
 #define b_current_source_current 0
 #define a_voltage_source_current 1
 #define b_voltage_source_current 0
 
-#define n_sample 8 //采样数
-#define average_num 5 //滑动平均个数
+#define n_sample 8				 //采样数
+#define average_num 5			 //滑动平均个数
+#define average_code_num 10 //滑动平均个数
 //DAC6571操作  P1.4接SDA(pin4),P1.5接SCL(pin5)
 #define SCL_L P1OUT &= ~BIT5
 #define SCL_H P1OUT |= BIT5
@@ -116,15 +117,15 @@ void Init_Devices(void)
 
 	//设置时钟，内部RC振荡器。     DCO：8MHz,供CPU时钟;  SMCLK：1MHz,供定时器时钟
 	BCSCTL1 = CALBC1_8MHZ; // Set range
-	DCOCTL = CALDCO_8MHZ;	 // Set DCO step + modulation
+	DCOCTL = CALDCO_8MHZ;	// Set DCO step + modulation
 	BCSCTL3 |= LFXT1S_2;	 // LFXT1 = VLO
 	IFG1 &= ~OFIFG;				 // Clear OSCFault flag
 	BCSCTL2 |= DIVS_3;		 //  SMCLK = DCO/8
 
-	Init_Ports();	 //调用函数，初始化I/O口
+	Init_Ports();	//调用函数，初始化I/O口
 	Init_Timer0(); //调用函数，初始化定时器0
-	Init_ADC10();	 //初始化ADC
-	_BIS_SR(GIE);	 //开全局中断
+	Init_ADC10();	//初始化ADC
+	_BIS_SR(GIE);	//开全局中断
 								 //all peripherals are now initialized
 }
 
@@ -188,7 +189,7 @@ __interrupt void Timer0_A0(void)
 	}
 	TM1638_RefreshDIGIandLED(digit, pnt, led); // 刷新全部数码管和LED指示灯
 
-	//检查当前键盘输入，0代表无键操作，1 - 16表示有对应按键号显示在两位数码管上 
+	//检查当前键盘输入，0代表无键操作，1 - 16表示有对应按键号显示在两位数码管上
 	key_code = TM1638_Readkeyboard();
 	if (key_code != 0)
 	{
@@ -196,38 +197,6 @@ __interrupt void Timer0_A0(void)
 			key_cnt++;
 		else if (key_cnt == 4)
 		{
-			// if (key_code == 1)
-			// {
-			// 	if (dac6571_voltage < DAC6571_voltage_max)
-			// 	{
-			// 		dac6571_voltage++;
-			// 		dac6571_flag = 1;
-			// 	}
-			// }
-			// else if (key_code == 2)
-			// {
-			// 	if (dac6571_voltage > 0)
-			// 	{
-			// 		dac6571_voltage--;
-			// 		dac6571_flag = 1;
-			// 	}
-			// }
-			// else if (key_code == 3)
-			// {
-			// 	if (dac6571_voltage < DAC6571_voltage_max - 10)
-			// 	{
-			// 		dac6571_voltage += 10;
-			// 		dac6571_flag = 1;
-			// 	}
-			// }
-			// else if (key_code == 4)
-			// {
-			// 	if (dac6571_voltage > 10)
-			// 	{
-			// 		dac6571_voltage -= 10;
-			// 		dac6571_flag = 1;
-			// 	}
-			// }
 			if (key_code == 5)
 			{
 				display_key = 0;
@@ -249,21 +218,21 @@ __interrupt void Timer0_A0(void)
 int main(void)
 {
 	int temp = -50;
-	int k, average_count = 0;												 //循环计数
-	unsigned int sum_current_source_voltage = 0;				 //电流源的采样电压
-	unsigned int sum_current_source_current = 0;				 //电流源的采样电流
-	unsigned int sum_voltage_source_current = 0;				 //电压源的采样电流
+	int k, average_count = 0, average_code_count = 0; //循环计数
+	unsigned int code = 0x0800; //用于滑动平均
+	unsigned int sum_current_source_voltage = 0;			//电流源的采样电压
+	unsigned int sum_current_source_current = 0;			//电流源的采样电流
+	unsigned int sum_voltage_source_current = 0;			//电压源的采样电流
 	double average_current_source_voltage, average_voltage_source_current, average_current_source_current;
-	double all_current_source_voltage = 0, all_current_source_current = 0, all_voltage_source_current = 0;
+	double all_current_source_voltage = 0, all_current_source_current = 0, all_voltage_source_current = 0, all_code = 0;
 	double current_temp1, current_temp2, balance;
 	double corrected_current_source_voltage, corrected_current_source_current, corrected_voltage_source_current;
 	int display_c_v, display_c_c, display_v_c; //待显示数字
-	//int temp_led, i;
-	unsigned int sample[32] = {0}; //存放ADC采样结果（一次转换产生的四个结果）
+	unsigned int sample[32] = {0};						 //存放ADC采样结果（一次转换产生的四个结果）
 	double average_current_source_queue_voltage[average_num] = {0};
 	double average_current_source_queue_current[average_num] = {0};
 	double average_voltage_source_queue_current[average_num] = {0};
-
+	double average_code[average_code_num] = {0};
 	Init_Devices();
 	while (clock100ms < 3)
 		;						 // 延时60ms等待TM1638上电完成
@@ -272,7 +241,7 @@ int main(void)
 	while (1)
 	{
 		///////ADC10转换///////
-		ADC10CTL0 &= ~ENC;              //关
+		ADC10CTL0 &= ~ENC; //关
 		while (ADC10CTL1 & BUSY)
 			;															//等待ADC10转换完成
 		ADC10CTL0 |= ENC + ADC10SC;			//开，采样，转换
@@ -315,25 +284,38 @@ int main(void)
 		if (clock100ms_flag == 1) // 检查0.1秒定时是否到
 		{
 			clock100ms_flag = 0;
-			current_temp1 = all_current_source_current * 0.1 / average_num; //负载均衡
-			current_temp2 = all_voltage_source_current * 0.1 / average_num;
+			current_temp1 = all_current_source_current * 100 / average_num; //负载均衡
+			current_temp2 = all_voltage_source_current * 100 / average_num;
 			balance = current_temp1 - current_temp2;
-			if (abs(balance) > 1)
+			if (abs(balance) > 2)
 			{
 				if (balance > 0)
-					temp += 5;
+					temp += 1;
 				else
-					temp -= 5;
-				dac6571_code = (current_temp1 + current_temp2) / 2 * 4096.0 / (DAC6571_voltage_max + 1) + temp;
-				dac6571_fastmode_operation();
+					temp -= 1;
 			}
+			code = (current_temp1 + current_temp2) / 2 * 4096.0 / (DAC6571_voltage_max + 1) + temp;
+			if (average_code_count < average_code_num) //建循环队列
+			{
+				average_code[average_code_count] = code;
+			}
+			else
+			{
+				average_code_count = 0;
+				average_code[0] = code;
+			}
+			all_code += average_code[average_code_count]; //求和
+			all_code -= average_code[(average_code_count + 1) % average_code_num];
+			dac6571_code = all_code / average_code_num;
+			average_code_count++;
+			dac6571_fastmode_operation();
 			//sum_voltage_source_current 控制 dac6571_code 控制输出电流使 sum_current_source_current == sum_voltage_source_current
 		}
 
 		///////数码管显示///////
-		corrected_current_source_voltage = a_current_source_voltage * average_current_source_voltage / average_num + b_current_source_voltage; //标定
-		corrected_voltage_source_current = a_voltage_source_current * average_voltage_source_current / average_num + b_voltage_source_current;
-		corrected_current_source_current = a_current_source_current * average_current_source_current / average_num + b_current_source_current;
+		corrected_current_source_voltage = a_current_source_voltage * all_current_source_voltage / average_num + b_current_source_voltage; //标定
+		corrected_voltage_source_current = a_voltage_source_current * all_voltage_source_current / average_num + b_voltage_source_current;
+		corrected_current_source_current = a_current_source_current * all_current_source_current / average_num + b_current_source_current;
 
 		display_c_v = (int)(1000 * corrected_current_source_voltage); //待显示数值
 		display_v_c = (int)(1000 * corrected_voltage_source_current);
@@ -341,20 +323,15 @@ int main(void)
 
 		if (display_key == 0) //key_code == 5
 		{
-			digit[4] = (display_c_v / 1000) % 10; 
+			digit[0] = ' ';
+			digit[1] = ' ';
+			digit[2] = ' ';
+			digit[3] = ' ';
+			digit[4] = (display_c_v / 1000) % 10;
 			digit[5] = (display_c_v / 100) % 10;
 			digit[6] = (display_c_v / 10) % 10;
 			digit[7] = (display_c_v / 1) % 10;
 			pnt = 0x10;
-			// pnt = 0x12;
-			// digit[0] = ' ';
-			// digit[1] = dac6571_voltage / 100 % 10; //计算个位数
-			// digit[2] = dac6571_voltage / 10 % 10;	 //计算十分位数
-			// digit[3] = dac6571_voltage % 10;			 //计算百分位数
-			// digit[4] = ' ';
-			// digit[5] = ' ';
-			// digit[6] = ' ';
-			// digit[7] = ' ';
 		}
 		if (display_key == 1) //key_code == 6
 		{
@@ -368,14 +345,5 @@ int main(void)
 			digit[7] = (display_c_c / 1) % 10;
 			pnt = 0x11;
 		}
-		// if (clock500ms_flag == 1) // 检查0.5秒定时是否到
-		// {
-		// 	clock500ms_flag = 0;
-		// 	// 8个指示灯以走马灯方式，每0.5秒向右（循环）移动一格
-		// 	temp_led = led[0];
-		// 	for (i = 0; i < 7; i++)
-		// 		led[i] = led[i + 1];
-		// 	led[7] = temp_led;
-		// }
 	}
 }
