@@ -287,12 +287,12 @@ int main(void)
 			current_temp1 = all_current_source_current * 100 / average_num; //负载均衡
 			current_temp2 = all_voltage_source_current * 100 / average_num;
 			balance = current_temp1 - current_temp2;
-			if (abs(balance) > 2)
+			if (abs(balance) > 1)
 			{
 				if (balance > 0)
-					temp += 1;
+					temp += 5;
 				else
-					temp -= 1;
+					temp -= 5;
 			}
 			code = (current_temp1 + current_temp2) / 2 * 4096.0 / (DAC6571_voltage_max + 1) + temp;
 			if (average_code_count < average_code_num) //建循环队列
