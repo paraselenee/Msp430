@@ -20,9 +20,9 @@
 #define b_current_source_current 0
 #define a_voltage_source_current 1
 #define b_voltage_source_current 0
-
-#define n_sample 8				 //采样数
-#define average_num 5			 //滑动平均个数
+#define length 5
+#define n_sample 8					//采样数
+#define average_num 5				//滑动平均个数
 #define average_code_num 10 //滑动平均个数
 //DAC6571操作  P1.4接SDA(pin4),P1.5接SCL(pin5)
 #define SCL_L P1OUT &= ~BIT5
@@ -217,12 +217,12 @@ __interrupt void Timer0_A0(void)
 //////////////////////////////
 int main(void)
 {
-	int temp = -50;
-	int k, average_count = 0, average_code_count = 0; //循环计数
-	unsigned int code = 0x0800; //用于滑动平均
-	unsigned int sum_current_source_voltage = 0;			//电流源的采样电压
-	unsigned int sum_current_source_current = 0;			//电流源的采样电流
-	unsigned int sum_voltage_source_current = 0;			//电压源的采样电流
+	int temp = 0;
+	int j, k, average_count = 0, average_code_count = 0; //循环计数
+	unsigned int code = 0x0800;													 //用于滑动平均
+	unsigned int sum_current_source_voltage = 0;				 //电流源的采样电压
+	unsigned int sum_current_source_current = 0;				 //电流源的采样电流
+	unsigned int sum_voltage_source_current = 0;				 //电压源的采样电流
 	double average_current_source_voltage, average_voltage_source_current, average_current_source_current;
 	double all_current_source_voltage = 0, all_current_source_current = 0, all_voltage_source_current = 0, all_code = 0;
 	double current_temp1, current_temp2, balance;
@@ -233,6 +233,8 @@ int main(void)
 	double average_current_source_queue_current[average_num] = {0};
 	double average_voltage_source_queue_current[average_num] = {0};
 	double average_code[average_code_num] = {0};
+	int steps[length] = {250, 125, 25, 5, 1};
+	int difference[length] = {120, 30, 10, 3, 1};
 	Init_Devices();
 	while (clock100ms < 3)
 		;						 // 延时60ms等待TM1638上电完成
@@ -284,17 +286,29 @@ int main(void)
 		if (clock100ms_flag == 1) // 检查0.1秒定时是否到
 		{
 			clock100ms_flag = 0;
-			current_temp1 = all_current_source_current * 100 / average_num; //负载均衡
+			current_temp1 = all_current_source_current * 100 / average_num; //电流值 数量级70mA
 			current_temp2 = all_voltage_source_current * 100 / average_num;
 			balance = current_temp1 - current_temp2;
-			if (abs(balance) > 1)
+			if (current_temp2 < 1) //稳压源过流保护
 			{
-				if (balance > 0)
-					temp += 5;
-				else
-					temp -= 5;
+				temp = 0;
 			}
-			code = (current_temp1 + current_temp2) / 2 * 4096.0 / (DAC6571_voltage_max + 1) + temp;
+			else
+			{
+				for (j = 0; j < length; j++) //变步长均衡
+				{
+					if (abs(balance) > difference[j])
+					{
+						if (balance > 0)
+							temp += steps[j];
+						else
+							temp -= steps[j];
+						break;
+					}
+				}
+			}
+			//是不是 /1000 ???
+			code = (current_temp1 + current_temp2) / 2 / 1000 * 4096.0 / (DAC6571_voltage_max + 1) + temp - 50;
 			if (average_code_count < average_code_num) //建循环队列
 			{
 				average_code[average_code_count] = code;
