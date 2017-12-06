@@ -229,7 +229,7 @@ unsigned char led[] = {0, 0, 0, 0, 0, 0, 0, 0};
 // key
 unsigned char key_code = 0;
 unsigned char key_cnt = 0;
-//Display current 1 and current 2 on 7-seg
+//Display current 1 and current 2 on 7-segment
 void Display_Stage3(void)
 {
 	unsigned int i;
